@@ -10,8 +10,8 @@ from models.model import UDAModel
 
 # Hyperparameters
 IMG_SIZE = 28
-BATCH_SIZE = 64
-EPOCHS = 2
+BATCH_SIZE = 1024
+EPOCHS = 1
 LR = 0.001
 
 # MNIST

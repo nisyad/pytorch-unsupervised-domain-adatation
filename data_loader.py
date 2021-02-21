@@ -11,7 +11,7 @@ class MNISTMDataset(Dataset):
     def __init__(self, data, transform=None):
 
         self.data = data[0].permute(0, 3, 1, 2)
-        self.labels = data[1].float()
+        self.labels = data[1]
         self.transform = transform
 
     def __len__(self):

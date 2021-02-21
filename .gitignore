@@ -1,0 +1,7 @@
+data/
+__pycache__/
+.vscode/
+.DS_Store
+OLD/
+results/
+exploration.ipynb
