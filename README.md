@@ -9,3 +9,5 @@ Pytoch implementations of:
 ## Datasets
 
 1. MINST -> MINST-M
+
+Set data directory to ./data/<dataset_name>/
