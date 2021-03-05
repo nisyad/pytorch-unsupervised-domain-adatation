@@ -1,7 +1,8 @@
 data/
 __pycache__/
+.ipynb_checkpoints/
 .vscode/
 .DS_Store
 OLD/
 results/
-exploration.ipynb
+explore.ipynb
