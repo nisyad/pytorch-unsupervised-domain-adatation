@@ -10,4 +10,4 @@ Pytoch implementations of:
 
 1. MINST -> MINST-M
 
-> Set data directory to ./data/<dataset_name>
+    Set data directory to ./data/<dataset_name>
