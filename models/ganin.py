@@ -3,6 +3,11 @@ from torch.autograd import Function
 
 
 class GaninModel(nn.Module):
+    """ MNIST architecture
+    +Dropout2d, 84% ~ 73%
+    -Dropout2d, 50% ~ 73%
+    """
+
     def __init__(self):
         super().__init__()
         self.restored = False
@@ -22,7 +27,7 @@ class GaninModel(nn.Module):
         )
 
         self.classifier = nn.Sequential(
-            nn.Linear(48 * 4 * 4, 100),
+            nn.Linear(48*4*4, 100),
             nn.BatchNorm1d(100),
             nn.ReLU(inplace=True),
             nn.Linear(100, 100),
@@ -32,10 +37,10 @@ class GaninModel(nn.Module):
         )
 
         self.discriminator = nn.Sequential(
-            nn.Linear(48 * 4 * 4, 100),
+            nn.Linear(48*4*4, 100),
             nn.BatchNorm1d(100),
             nn.ReLU(inplace=True),
-            nn.Linear(100, 2),
+            nn.Linear(100, 1),
         )
 
     def forward(self, input_data, alpha):

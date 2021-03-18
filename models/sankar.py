@@ -10,17 +10,20 @@ class FeatureExtractor(nn.Module):
 
         self.feature = nn.Sequential(
             nn.Conv2d(3, self.num_filters_disc, 5, stride=1, padding=0),
+            # nn.BatchNorm2d(self.num_filters_disc),
             nn.ReLU(), nn.MaxPool2d(2, stride=2),
             nn.Conv2d(self.num_filters_disc,
                       self.num_filters_disc,
                       5,
                       stride=1,
                       padding=0), nn.ReLU(), nn.MaxPool2d(2, stride=2),
+            # nn.BatchNorm2d(self.num_filters_disc),
             nn.Conv2d(self.num_filters_disc,
                       2 * self.num_filters_disc,
                       5,
                       stride=1,
                       padding=0), nn.ReLU())
+            
 
     def forward(self, input):
         output = self.feature(input)
@@ -29,7 +32,7 @@ class FeatureExtractor(nn.Module):
 
 
 class ClassifierNet(nn.Module):
-    def __init__(self, num_filters_disc=64, n_classes=10):
+    def __init__(self, n_classes, num_filters_disc=64):
         super().__init__()
 
         self.classifier = nn.Sequential(
@@ -44,17 +47,17 @@ class ClassifierNet(nn.Module):
 
 
 class Generator(nn.Module):
-    def __init__(self, n_dim, z_dim, n_classes, num_filters_gen=64):
+    def __init__(self, n_classes, z_dim, num_filters_gen=64, num_filters_disc=64):
         super().__init__()
 
-        self.n_dim = n_dim
+        self.f_out_dim = 2 * num_filters_disc
         self.z_dim = z_dim
         self.n_classes = n_classes
         self.num_filters_gen = num_filters_gen
 
         self.gen = nn.Sequential(
             nn.ConvTranspose2d(
-                self.z_dim + self.n_dim + n_classes + 1,
+                self.z_dim + self.f_out_dim + n_classes + 1,
                 self.num_filters_gen * 8,
                 2,
                 1,
@@ -93,7 +96,7 @@ class Generator(nn.Module):
 
     def forward(self, input):
         # batch_size = input.shape[0]
-        input = input.view(-1, self.z_dim + self.n_dim + self.n_classes + 1, 1,
+        input = input.view(-1, self.f_out_dim + self.z_dim + self.n_classes + 1, 1,
                            1)
         # noise = torch.randn(batch_size, self.z_dim, 1, 1)
         # output = self.gen(torch.cat((input, noise), 1))
@@ -136,7 +139,7 @@ class Discriminator(nn.Module):
         )
 
         self.classifier_c = nn.Sequential(
-            nn.Linear(self.num_filters_disc * 2, self.n_classes))
+            nn.Linear(2 * self.num_filters_disc, self.n_classes))
 
     def forward(self, input):
         output = self.disc(input)

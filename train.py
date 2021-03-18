@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 import numpy as np
 import torch
 import torch.nn as nn
@@ -6,20 +7,34 @@ import torch.optim as optim
 from torchvision import datasets, transforms
 
 import data_loader
-from models.model import UDAModel
+from models.ganin import GaninModel
 
-# Hyperparameters
+# Ensure deterministic behavior
+torch.backends.cudnn.deterministic = True
+# random.seed(hash("setting random seeds") % 2**32 - 1)
+np.random.seed(hash("improves reproducibility") % 2**32 - 1)
+torch.manual_seed(hash("by removing stochasticity") % 2**32 - 1)
+torch.cuda.manual_seed_all(hash("so runs are repeatable") % 2**32 - 1)
+
+# Pytorch performance tuninng guide - NVIDIA
+torch.backends.cudnn.benchmark = True  # speeds up convolution operations
+
+# Device
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+print("Device: ", device)
+
+# HYPERPARAMETERS
 IMG_SIZE = 28
-BATCH_SIZE = 1024
-EPOCHS = 1
-LR = 0.001
+BATCH_SIZE = 64
+EPOCHS = 2
+LR = 2e-4
 
 # MNIST
 transform_m = transforms.Compose(
     [transforms.ToTensor(),
      transforms.Normalize((0.5, ), (0.5, ))])
 
-trainset_m = datasets.MNIST("./data/mnist",
+trainset_m = datasets.MNIST("data/mnist",
                             train=True,
                             download=True,
                             transform=transform_m)
@@ -27,10 +42,11 @@ trainloader_m = torch.utils.data.DataLoader(trainset_m,
                                             batch_size=BATCH_SIZE,
                                             shuffle=True)
 
-testset_m = datasets.MNIST(".data/mnist",
+testset_m = datasets.MNIST("data/mnist",
                            train=False,
                            download=True,
                            transform=transform_m)
+
 testloader_m = torch.utils.data.DataLoader(testset_m,
                                            batch_size=BATCH_SIZE,
                                            shuffle=True)
@@ -55,25 +71,41 @@ testloader_mm = data_loader.fetch(
     transform=transform_mm,
 )
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-net = UDAModel().to(device)
+# INILIALIZE NET
+net = GaninModel().to(device)
 
+# SET CRITERION and OPTIMIZER
 criterion_l = nn.CrossEntropyLoss()
 criterion_d = nn.BCEWithLogitsLoss()
 optimizer = optim.Adam(net.parameters(), lr=LR)
 
-num_batches = min(len(trainloader_m), len(trainloader_mm))
+num_batches = min(len(trainloader_m), len(trainloader_mm))  # ~60000/batch_size
+print("No. of Batches: ", num_batches)
+
+# DEVICE DETAILS
+if device.type == 'cuda':
+    print(torch.cuda.get_device_name(0))
+    print('Memory Allocated: (GB)')
+    print('Allocated: ', round(torch.cuda.memory_allocated(0) / 1024**3, 1))
+    print('Cached: ', round(torch.cuda.memory_reserved(0) / 1024**3, 1))
+
+# TRAINING
+test_accuracy = []
+start_time = datetime.now()
 
 for epoch in range(EPOCHS):
+
     running_loss_total = 0
     running_loss_l = 0
     running_loss_d = 0
 
     dataiter_mm = iter(trainloader_mm)
     dataiter_m = iter(trainloader_m)
-    lamda = (2 / (1 + np.exp(-10 * ((epoch + 0.0) / EPOCHS)))) - 1
+    alpha = (2 / (1 + np.exp(-10 * ((epoch + 0.0) / EPOCHS)))) - 1
+    print(f"alpha: {alpha}")
 
-    for c in range(num_batches):
+    net.train()
+    for batch in range(1, num_batches + 1):
         loss_total = 0
         loss_d = 0
         loss_l = 0
@@ -83,54 +115,63 @@ for epoch in range(EPOCHS):
         imgs, lbls = dataiter_m.next()
         imgs, lbls = imgs.to(device), lbls.to(device)
         imgs = torch.cat((imgs, imgs, imgs), 1)
-        out_l, out_d = net(imgs, lamda)  # lambda==lambda
-        loss_l = criterion_l(out_l, lbls)
-        actual_d = torch.zeros(out_d.shape)
-        actual_d = actual_d.to(device)
-        loss_d = criterion_d(out_d, actual_d)
+
+        # with torch.cuda.amp.autocast():
+        out_l, out_d = net(imgs, alpha)
+        loss_l_src = criterion_l(out_l, lbls)
+        actual_d = torch.zeros(out_d.shape).to(device)
+        loss_d_src = criterion_d(out_d, actual_d)
 
         #for target domain
         imgs, lbls = dataiter_mm.next()
         imgs = imgs.to(device)
-        _, out_d = net(imgs, lamda)
-        actual_d = torch.ones(out_d.shape)
-        actual_d = actual_d.to(device)
-        loss_d += criterion_d(out_d, actual_d)
 
-        loss_total = loss_d + loss_l
+        # with torch.cuda.amp.autocast():
+        _, out_d = net(imgs, alpha)
+        actual_d = torch.ones(out_d.shape).to(device)
+        loss_d_tgt = criterion_d(out_d, actual_d)
+
+        loss_total = loss_d_src + loss_l_src + loss_d_tgt
         loss_total.backward()
         optimizer.step()
-        #scheduler.step()
+
         running_loss_total += loss_total
-        running_loss_d += loss_d
-        running_loss_l += loss_l
+        running_loss_d += loss_d_src + loss_d_tgt
+        running_loss_l += loss_l_src
 
-    else:
-        test_loss = 0
-        accuracy = 0
+        if batch % 300 == 0:
+            print(f"Epoch: {epoch}/{EPOCHS} Batch: {batch}/{num_batches}")
+            print(f"Total Loss: {running_loss_total/batch}")
+        #   print(f"Label Loss: {running_loss_l/batch}")
+        #   print(f"Domain Loss: {running_loss_d/batch}")
 
-        with torch.no_grad():
-            net.eval()
-            for imgs, lbls in testloader_mm:
-                imgs, lbls = imgs.to(device), lbls.to(device)
-                #print(logits.shape,lbls.shape)
-                logits, _ = net(imgs, lamda)
-                #lbls = lbls.view(*logits.shape)
-                #print(logits.shape,lbls.shape)
-                test_loss += criterion_l(logits, lbls)
+    net.eval()
+    test_loss = 0
+    accuracy = 0
 
-                ps = torch.exp(logits) / (torch.sum(torch.exp(logits)))
-                top_p, top_class = ps.topk(1, dim=1)
-                equals = top_class == lbls.view(*top_class.shape)
-                #print(top_class,lbls.view(*top_class.shape))
-                accuracy += torch.mean(equals.type(torch.FloatTensor))
-        net.train()
+    with torch.no_grad():
+        net.eval()
+        for imgs, lbls in testloader_mm:
+            imgs, lbls = imgs.to(device), lbls.to(device)
+            # print(imgs.shape)
+            # print(lbls.shape)
 
-    #print("Learning Rate: {}".format(optimizer.param_groups[0]['lr']))
-    print("Epoch: {}/{} ...".format(epoch + 1, EPOCHS))
-    print("Lambda: {}".format(lamda))
-    print("Total running_loss: {}".format(running_loss_total / num_batches))
-    print("Domain running_loss: {}".format(running_loss_d / num_batches))
-    print("Label running_loss: {}".format(running_loss_l / num_batches))
-    print("Test Loss: {}".format(test_loss / len(testloader_mm)))
-    print("Test accuracy: {}".format(accuracy / len(testloader_mm)))
+            logits, _ = net(imgs, alpha=0)
+            # print(logits.shape)
+            test_loss += criterion_l(logits, lbls)
+
+            # derive which class index corresponds to max value
+            preds_l = torch.max(
+                logits,
+                dim=1)[1]  # [1]: indices(class) corresponding to max values
+            equals = torch.eq(preds_l,
+                              lbls)  # count no. of correct class predictions
+            accuracy += torch.mean(equals.float())
+
+    test_accuracy.append(accuracy / len(testloader_mm))
+    print(f"Test accuracy: {accuracy / len(testloader_mm)}")
+    print("\n")
+
+end_time = datetime.now()
+duration = end_time - start_time
+print(f"Training Time for {EPOCHS} epochs: {duration}")
