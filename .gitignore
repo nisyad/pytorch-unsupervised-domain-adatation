@@ -1,6 +1,7 @@
 data/
 __pycache__/
 .ipynb_checkpoints/
+.gitignore
 .vscode/
 .DS_Store
 OLD/
