@@ -1,4 +1,4 @@
-from torchvision import datasets, transforms
+from torchvision import transforms
 
 
 def get_transform(dataset):

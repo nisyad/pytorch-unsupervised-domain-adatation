@@ -1,10 +1,7 @@
-import os
 from datetime import datetime
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torchvision import datasets, transforms
 
 from datasets import mnist, mnist_m
 from models.ganin import GaninModel
@@ -43,15 +40,20 @@ def main():
     )
 
     trainloader_m = mnist.fetch(data_dir="data/mnist/processed/train.pt",
+                                transform=transform_m,
                                 **loaders_args)
 
+    # fetching testloader_m for symmetry but it is not needed in the code
     testloader_m = mnist.fetch(data_dir="data/mnist/processed/test.pt",
+                               transform=transform_m,
                                **loaders_args)
 
     trainloader_mm = mnist_m.fetch(data_dir="data/mnist_m/processed/train.pt",
+                                   transform=transform_mm,
                                    **loaders_args)
 
     testloader_mm = mnist_m.fetch(data_dir="data/mnist_m/processed/test.pt",
+                                  transform=transform_mm,
                                   **loaders_args)
 
     # criterion
