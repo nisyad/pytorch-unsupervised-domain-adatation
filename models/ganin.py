@@ -7,7 +7,6 @@ class GaninModel(nn.Module):
     +Dropout2d, 84% ~ 73%
     -Dropout2d, 50% ~ 73%
     """
-
     def __init__(self):
         super().__init__()
         self.restored = False
@@ -27,7 +26,7 @@ class GaninModel(nn.Module):
         )
 
         self.classifier = nn.Sequential(
-            nn.Linear(48*4*4, 100),
+            nn.Linear(48 * 4 * 4, 100),
             nn.BatchNorm1d(100),
             nn.ReLU(inplace=True),
             nn.Linear(100, 100),
@@ -37,7 +36,7 @@ class GaninModel(nn.Module):
         )
 
         self.discriminator = nn.Sequential(
-            nn.Linear(48*4*4, 100),
+            nn.Linear(48 * 4 * 4, 100),
             nn.BatchNorm1d(100),
             nn.ReLU(inplace=True),
             nn.Linear(100, 1),
@@ -64,4 +63,4 @@ class ReverseGradientLayer(Function):
     @staticmethod
     def backward(ctx, grad_output):
 
-        return -ctx.alpha * grad_output, None
+        return -1 * ctx.alpha * grad_output, None

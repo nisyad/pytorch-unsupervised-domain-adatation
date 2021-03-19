@@ -1,3 +1,5 @@
+import numpy as np
+import torch
 from torch.nn import init
 
 
@@ -39,3 +41,17 @@ def exp_lr_scheduler(optimizer, epoch, init_lr, lrd, nevals):
         param_group['lr'] = lr
 
     return optimizer
+
+
+def set_random_seed(seed=12345):
+
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cuda.deterministic = True
+
+
+def get_alpha(epoch, EPOCHS):
+    alpha = (2 / (1 + np.exp(-10 * ((epoch + 0.0) / EPOCHS)))) - 1
+
+    return alpha

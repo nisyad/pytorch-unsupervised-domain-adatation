@@ -1,16 +1,12 @@
 import torch
 from torch.utils.data import Dataset, DataLoader
 
-# transform = transforms.Compose([
-#     transforms.ToTensor(),
-#     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-# ])
 
-
-class MNISTMDataset(Dataset):
+class MNISTDataset(Dataset):
     def __init__(self, data, transform=None):
 
-        self.data = data[0].permute(0, 3, 1, 2)
+        self.data = data[0].unsqueeze(3)  # [N,28,28,1]
+        self.data = self.data.permute(0, 3, 1, 2)
         self.labels = data[1]
         self.transform = transform
 
@@ -28,15 +24,21 @@ class MNISTMDataset(Dataset):
         return X, y
 
 
-def fetch(data_dir, batch_size=128, shuffle=True, transform=None):
+def fetch(data_dir,
+          batch_size=128,
+          transform=None,
+          shuffle=True,
+          num_workers=1,
+          pin_memory=True):
 
     data = torch.load(data_dir)
 
-    dataset = MNISTMDataset(data=data, transform=transform)
+    dataset = MNISTDataset(data=data, transform=transform)
 
     dataloader = DataLoader(dataset,
                             batch_size=batch_size,
                             shuffle=shuffle,
-                            num_workers=0)
+                            num_workers=num_workers,
+                            pin_memory=pin_memory)
 
     return dataloader
